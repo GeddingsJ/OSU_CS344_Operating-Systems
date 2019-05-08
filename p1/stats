@@ -1,0 +1,260 @@
+#!/bin/bash
+
+#PROGRAM 1: stats
+#Write a bash script that accepts test files and returns the
+#  average and median of either column or row depending on user request
+#Created by: Jacob Geddings
+#Ending note: Sorry on file five for the grading script -- it hangs for awhile
+#  then spits out a wall of nothing -- gets the median though!
+
+#Effort to protect against unexpected exits
+trap "rm -f temp*; exit" SIGHUP SIGINT SIGTERM
+
+#Variable for confirming which argument was passed ROW/COLUMN
+rowCol=0
+
+
+#Determine how the test files will be submitted
+datafilepath="datafile$$"
+if [ "$#" = "1" ]
+then
+	cat > "$datafilepath"
+elif [ "$#" = "2" ] 
+then
+	datafilepath=$2
+else
+	#If the submission is bad -- spit an error out
+	echo "Error has occured in data entry" 1>&2
+	exit 1
+fi
+
+#Determine if the user wants to use rows or columns 
+if [[ $1 == -r* ]]; 
+then
+	rowCol=0;
+elif [[ $1 == -c* ]]; 
+then
+	rowCol=1;
+else
+	#If the submission is bad -- spit an error out
+	echo "Error has occured in arg 1" 1>&2
+	exit 1
+fi
+
+#INPUT FILES -- where test file will be sent to be interpreted
+inputFile="tempinputfile"
+outputFile="tempoutputfile"
+
+#COL MEDIAN FILES
+cMedLine="tempcolmedline"
+cMedLineSet="tempcolsetmed"
+wcReader="tempwcreader"
+cMedFinal="tempcolmedfinal"
+
+#ROW MEDIAN FILES
+sF="tempsorterfile"
+eF="tempexperimentfile"
+fF="tempfinalsortfile"
+mF="tempmediansortfile"
+
+#ROW AVERAGE FILES
+avgR="tempaveragerowfile"
+
+#COL AVERAGE FILES
+cAvgLine="tempcolavgline"
+cAvgLineFinal="tempcavglinefinal"
+cAvgLineSet="tempcolavglineset"
+cAvg="tempcolavgstorage"
+avgCol="tempcolumnavgfile"
+cAvgLineReady="tempaveragelineready"
+avgwcReader="tempavgwcreader"
+
+
+#Place test files into inputFile to be used for remainder of program.
+cat $datafilepath > $inputFile$$
+
+#AVG COLUMN -- Ultimately couldn't resolve in time 
+#----------------------------------------
+#wordavgc=1
+#avgCLoop=1
+#wc -l < $inputFile$$ > $avgwcReader$$
+#while read valAvgC
+#do
+#	wordavgc=$valAvgC
+#done < $avgwcReader$$
+
+#while read testaC
+#do
+#	cut -f $avgCLoop $inputFile$$ > $cAvgLineSet$$
+#	cut -c 1- $cAvgLineSet$$ > $cAvgLine$$
+#	((avgCLoop=avgCLooper+1))
+	
+#	sumC=0
+#	avgTempC=0
+#	tempTickC=0
+#	tickerC=0
+#	internalCounter=0	
+
+#	while read -a testSingleCol
+#	do
+#		sumC=$(expr $sum + $internalCounter)
+
+		#echo -e "sum: $sum"
+
+#		internCounter=$(expr $internalCounter + 1)
+#		tickerC=$(expr $tickerC + 1)
+#	done < $cAvgLine$$
+	
+#	tempTickC=$(expr $tickerC / 2)
+#	avgTempC=$(expr $sumC + $tempTickC)
+#	averageC=$(expr $avgTempC / $tickerC)
+	#echo -e "AVERAGE: $averageC"
+	
+#done < $inputFile$$
+#----------------------------------------
+
+
+
+
+#SORT COLUMN AND GET MEDIAN -- store in $cMedFinal$$
+#----------------------------------------
+
+#Store test file into cMedLine for local testing
+cat $inputFile$$ > $cMedLine$$
+looper=1
+
+#Determine number of rows present
+#Store total number in file wcReader
+wordc=1
+wc -l < $cMedLine$$ > $wcReader$$
+
+#Translate wcReader line value into a variable 
+while read val
+do
+	wordc=$val
+done < $wcReader$$
+
+#Location of median value 
+wordc=$(expr $wordc / 2)
+wordc=$(expr $wordc + 1)
+
+#Retrieve a single column of data at a time from inputFile
+while read testC
+do
+	#Cut a column out where column number is determined by looper
+	#Once column location is determined, take it from inputFile and store it in cMedLineSet
+	cut -f $looper $inputFile$$ > $cMedLineSet$$
+
+	#Cut excess data from the back of the column without trimming the data needed 
+	#Store in cMedline and increment for next column to be taken
+	cut -c 1- $cMedLineSet$$ > $cMedLine$$
+	((looper=looper+1))
+	
+	#Current column is sorted and stored in cMedLineSet
+	sort -n < $cMedLine$$ > $cMedLineSet$$	
+
+	#Use wordc as target location for median extraction
+	#Once median value is obtained append it to cMedFinal 
+	head -n $wordc < $cMedLineSet$$ | tail -n 1 >> $cMedFinal$$
+	
+done < $inputFile$$
+#----------------------------------------
+
+
+
+
+#SORT ROW AND GET MEDIAN -- store in $mF$$ file
+#-----------------------------------------
+
+#Variables to track loop cycles
+tickTock=1
+count=1
+
+#Determine quantity of rows in test files
+while read
+do
+	((count=count+1))
+done < $inputFile$$
+
+
+#Adjust row quantity to now point to median location
+count=$(expr $count + 1)
+count=$(expr $count / 2)
+
+#Loop test files to get each row
+while read
+do
+	#Acquire row based on tickTock and store it in sF then increment tickTock
+	head -n $tickTock < $inputFile$$ | tail -n 1 > $sF$$
+	((tickTock=tickTock+1))
+
+	#Convert row into a column and store to eF
+	cat $sF$$ | tr '\t' '\n' > "$eF$$"
+	
+	#Sort the column in correct order and store to fF
+	sort -n < $eF$$ > $fF$$	
+
+	#Use count to location median location and append value into mF
+	head -n $count < $fF$$ | tail -n 1 >> $mF$$
+
+done < $inputFile$$
+#-----------------------------------------
+
+
+
+#AVERAGE ROW -- store in avgR
+#-----------------------------------------
+
+#Loop through test file to acquire average per row
+while read test
+do
+	#Set variables for average
+	sum=0
+	avgTemp=0
+	tempTick=0
+	ticker=0
+
+	#Nested for loop to extract each row's sum and quantity
+	for num in $test
+	do
+		sum=$(expr $sum + $num)
+		ticker=$(expr $ticker + 1)
+	done 
+	
+	#Average determined by:
+	#(a + (b / 2)) / b
+	tempTick=$(expr $ticker / 2)
+	avgTemp=$(expr $sum + $tempTick)
+	average=$(expr $avgTemp / $ticker)
+	
+	#Average appended to avgR
+	echo -e "$average" >> $avgR$$
+
+done < $inputFile$$
+#----------------------------------------
+
+
+
+#DISPLAY TO USER
+#----------------------------------------
+if [[ $rowCol == 0 ]];
+then
+	#If row was requested:
+	echo -e "Average: ";
+	cat $avgR$$;
+	echo -e "Median: ";
+	cat $mF$$;
+elif [[ $rowCol == 1 ]];
+then
+	#If column was requested:
+	echo -e "Average: ";
+	#cat $avgC$$;
+	echo -e "Median: ";
+	cat $cMedFinal$$;
+fi
+#----------------------------------------
+
+
+#removal of temporary file as clean up
+rm -f temp*
+rm -f data*
